@@ -1,27 +1,24 @@
-# Parsing API Service
+# API для парсинга
 
-Асинхронный сервис для постановки задач на парсинг сайтов. Сервис принимает запросы от пользователя, валидирует допустимость домена, сохраняет состояние задач и прокидывает их в RabbitMQ, откуда их забирают воркеры (Selenium, HTTP-parser, LLM и т.д. — см. диаграмму проекта).
+Проект обслуживает одну задачу — принимать ссылки от пользователей и раскладывать их по очередям на обработку. API асинхронный, построен на FastAPI и использует HTTPX для запросов к целевым сайтам. После постановки в очередь воркеры (Selenium/LLM/что угодно) разбирают задания и возвращают результат в Redis/БД — всё как на схеме проекта.
 
-## Архитектура
+## Что внутри
 
-- **FastAPI** — HTTP-сервис для приёма запросов от фронта/ботов.
-- **HTTPX** — переиспользуемый клиент (`ParserClient`) для загрузки HTML/JSON с целевых сайтов.
-- **RabbitMQ** — `TaskDispatcher` публикует сообщения в exchange `parser.tasks`, далее задачи обрабатываются исполнителями (SEL, LLM и прочие).
-- **Redis** — `TaskStateRepository` хранит статус задач; при отсутствии Redis автоматически используется in-memory реализация.
-- **Config** — все параметры настраиваются через `.env` с префиксом `APP_` (см. `app/core/config.py`).
+- `ParserClient` на базе HTTPX тянет страницы, переиспользует пул соединений и делает повторные попытки при сетевых сбоях.
+- `TaskDispatcher` публикует задания в RabbitMQ (`parser.tasks`, ключи `parse.*`).
+- `TaskStateRepository` держит статусы задач: в продакшене через Redis, локально — in-memory fallback.
+- Конфигурация подтягивается из `.env` с префиксом `APP_` (см. `app/core/config.py`).
 
-## Быстрый старт
+## Как запустить локально
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate      # Windows
+.venv\Scripts\activate
 pip install -r requirements.txt
-
-# Локальный запуск (по умолчанию FastAPI слушает 8000 порт)
 uvicorn app.main:app --reload
 ```
 
-Переменные окружения (пример `.env`):
+Минимальный `.env`:
 
 ```
 APP_ENVIRONMENT=development
@@ -29,34 +26,23 @@ APP_RABBITMQ_URL=amqp://guest:guest@localhost/
 APP_REDIS_URL=redis://localhost:6379/0
 APP_HTTP_TIMEOUT=10.0
 APP_HTTP_MAX_RETRIES=3
-APP_ALLOWED_DOMAINS=example.com,example.org  # необязательный whitelist
+APP_ALLOWED_DOMAINS=example.com,example.org
 ```
 
-## Основные REST-эндпоинты (`/v1`)
+## REST-эндпоинты `/v1`
 
-| Метод | Путь | Описание |
-|-------|------|----------|
-| `GET` | `/healthz` | Простой health-check. |
-| `POST` | `/parse` | Поставить одну ссылку на парсинг. Возвращает `task_id`. |
-| `POST` | `/parse/bulk` | Массовая постановка задач. |
-| `GET` | `/tasks/{task_id}` | Статус задачи (queued / in_progress / done / failed). |
-| `GET` | `/preview?url=...` | Быстро подтянуть HTML для дебага (не забываем ограничить доступ в проде). |
+| Метод | Путь | Назначение |
+|-------|------|------------|
+| GET   | `/healthz` | Простой пинг |
+| POST  | `/parse` | Ставит одну ссылку в очередь, возвращает `task_id` |
+| POST  | `/parse/bulk` | Пакетная постановка ссылок |
+| GET   | `/tasks/{task_id}` | Узнать статус задачи |
+| GET   | `/preview?url=` | Быстрый просмотр HTML (только для внутреннего пользования) |
 
-## Интеграция с воркерами
+## Дальше по плану
 
-1. Воркеры подписываются на exchange `parser.tasks` с routing-key `parse.*`.
-2. Получив задачу, воркер обрабатывает ссылку (HTTP парсер, Selenium, LLM и т.д.).
-3. Результат складывается в Redis через `TaskStateRepository.set_state(TaskState(...))`, чтобы API `/tasks/{task_id}` возвращал актуальное состояние.
+1. Подружить API с авторизацией (JWT или токен).
+2. Реализовать воркер, который забирает задания из RabbitMQ и обновляет статусы в Redis.
+3. Собрать docker-compose и базовый CI (линтеры, pytest, mypy).
 
-## Git flow
-
-1. Основная разработка ведётся в ветке `develop`.
-2. Фичи — в ветках вида `feature/<name>` (текущий код в `feature/parsing-api`).
-3. Перед релизом мерджим в `release/x.y` и после тестирования — в `main`.
-
-## Дальнейшие шаги
-
-- Подключить авторизацию (JWT/Telegram OAuth) к публичным эндпоинтам.
-- Реализовать воркеры (Selenium/Playwright) и интеграцию с RabbitMQ/Redis на прод-инфраструктуре.
-- Настроить CI (линтеры, mypy, pytest) и контейнеризацию (Dockerfile + docker-compose).
-
+Фича лежит в `feature/parsing-api`, готова к ревью и интеграции по git flow.
