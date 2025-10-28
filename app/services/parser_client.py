@@ -13,13 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class ParserClient(httpx.AsyncClient):
-    """
-    HTTPX client specialized for fetching upstream pages that will later be parsed.
-
-    The client reuses connections across requests and implements a simple retry
-    loop to mitigate transient upstream failures.
-    """
-
     def __init__(self, settings: Settings):
         self._settings = settings
         super().__init__(
@@ -32,12 +25,10 @@ class ParserClient(httpx.AsyncClient):
         )
 
     async def fetch_html(self, url: str, *, max_retries: int | None = None) -> str:
-        """Fetch raw HTML from the supplied URL with optional retries."""
         response = await self._request_with_retry("GET", url, max_retries=max_retries)
         return response.text
 
     async def fetch_json(self, url: str, *, max_retries: int | None = None) -> Any:
-        """Fetch JSON payload from the supplied URL with optional retries."""
         response = await self._request_with_retry("GET", url, max_retries=max_retries)
         return response.json()
 
@@ -49,7 +40,6 @@ class ParserClient(httpx.AsyncClient):
         max_retries: int | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
-        """Perform an HTTP request with a naive exponential backoff policy."""
         self._settings.validate_url(url)
 
         retries = self._settings.http_max_retries if max_retries is None else max_retries
@@ -63,7 +53,6 @@ class ParserClient(httpx.AsyncClient):
                 response.raise_for_status()
                 return response
             except httpx.HTTPStatusError as exc:
-                # Re-raise immediately for client errors to avoid hitting robots/ban policies.
                 if 400 <= exc.response.status_code < 500:
                     raise
                 last_exc = exc
@@ -85,6 +74,5 @@ class ParserClient(httpx.AsyncClient):
             await asyncio.sleep(delay)
             delay *= 2
 
-        assert last_exc is not None  # for type checkers
+        assert last_exc is not None
         raise last_exc
-

@@ -8,8 +8,6 @@ from app.core.config import settings
 
 
 class ParseRequest(BaseModel):
-    """Request payload for submitting a new parsing job."""
-
     url: HttpUrl
     parser_type: str = "default"
     metadata: dict[str, Any] | None = None
@@ -22,8 +20,6 @@ class ParseRequest(BaseModel):
 
 
 class BulkParseRequest(BaseModel):
-    """Accept multiple URLs in one request."""
-
     urls: list[HttpUrl]
     parser_type: str = "default"
     metadata: dict[str, Any] | None = None
@@ -36,4 +32,3 @@ class BulkParseRequest(BaseModel):
         for url in value:
             settings.validate_url(str(url))
         return value
-

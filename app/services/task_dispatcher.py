@@ -7,8 +7,8 @@ from typing import Any
 
 try:
     import aio_pika
-except ImportError as exc:  # pragma: no cover - optional dependency at runtime
-    aio_pika = None  # type: ignore[assignment]
+except ImportError:
+    aio_pika = None
 
 from app.core.config import Settings
 
@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class TaskEnvelope:
-    """Serializable message body for RabbitMQ."""
-
     task_id: str
     url: str
     parser_type: str = "default"
@@ -37,13 +35,9 @@ class TaskEnvelope:
 
 
 class TaskDispatcher:
-    """Publish parsing jobs to RabbitMQ."""
-
     def __init__(self, settings: Settings, exchange_name: str = "parser.tasks"):
-        if aio_pika is None:  # pragma: no cover - handled during runtime init
-            raise RuntimeError(
-                "aio-pika is required for TaskDispatcher. Install it via 'pip install aio-pika'."
-            )
+        if aio_pika is None:
+            raise RuntimeError("aio-pika is required for TaskDispatcher. Install it via 'pip install aio-pika'.")
 
         self._settings = settings
         self._exchange_name = exchange_name
@@ -69,7 +63,7 @@ class TaskDispatcher:
         if self._channel is None or self._exchange is None:
             await self.connect()
 
-        assert self._channel is not None  # for mypy
+        assert self._channel is not None
         assert self._exchange is not None
 
         message = aio_pika.Message(

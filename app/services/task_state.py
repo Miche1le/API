@@ -7,8 +7,8 @@ from typing import Any
 
 try:
     import redis.asyncio as aioredis
-except ImportError:  # pragma: no cover - optional dependency
-    aioredis = None  # type: ignore[assignment]
+except ImportError:
+    aioredis = None
 
 
 logger = logging.getLogger(__name__)
@@ -23,23 +23,17 @@ class TaskState:
 
 
 class TaskStateRepository:
-    """Abstract repository interface for task status storage."""
-
-    async def set_state(self, state: TaskState) -> None:  # pragma: no cover - interface
+    async def set_state(self, state: TaskState) -> None:
         raise NotImplementedError
 
-    async def get_state(self, task_id: str) -> TaskState | None:  # pragma: no cover - interface
+    async def get_state(self, task_id: str) -> TaskState | None:
         raise NotImplementedError
 
 
 class RedisTaskStateRepository(TaskStateRepository):
-    """Redis-backed implementation."""
-
     def __init__(self, redis_url: str):
-        if aioredis is None:  # pragma: no cover - environment specific
-            raise RuntimeError(
-                "redis-py[asyncio] is required for RedisTaskStateRepository. Install via 'pip install redis'."
-            )
+        if aioredis is None:
+            raise RuntimeError("redis-py[asyncio] is required for RedisTaskStateRepository. Install via 'pip install redis'.")
 
         self._client = aioredis.from_url(redis_url, encoding="utf-8", decode_responses=True)
 
@@ -67,8 +61,6 @@ class RedisTaskStateRepository(TaskStateRepository):
 
 
 class InMemoryTaskStateRepository(TaskStateRepository):
-    """Fallback repository used in development environments."""
-
     def __init__(self):
         self._store: dict[str, TaskState] = {}
 
@@ -78,4 +70,3 @@ class InMemoryTaskStateRepository(TaskStateRepository):
 
     async def get_state(self, task_id: str) -> TaskState | None:
         return self._store.get(task_id)
-

@@ -9,8 +9,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application configuration loaded from environment variables."""
-
     model_config = SettingsConfigDict(
         env_prefix="APP_",
         env_file=".env",
@@ -21,33 +19,13 @@ class Settings(BaseSettings):
     app_name: str = "Parsing API"
     environment: str = "development"
 
-    rabbitmq_url: str = Field(
-        default="amqp://guest:guest@localhost/",
-        description="Connection string for RabbitMQ dispatcher.",
-    )
-    redis_url: str = Field(
-        default="redis://localhost:6379/0",
-        description="Redis instance used for task caching / deduplication.",
-    )
+    rabbitmq_url: str = Field(default="amqp://guest:guest@localhost/")
+    redis_url: str = Field(default="redis://localhost:6379/0")
 
-    http_timeout: float = Field(
-        default=10.0,
-        gt=0,
-        description="Default timeout (seconds) for upstream HTTP requests.",
-    )
-    http_max_retries: int = Field(
-        default=3,
-        ge=0,
-        description="Number of retry attempts for transient upstream failures.",
-    )
-    parser_user_agent: str = Field(
-        default="CourseParserBot/1.0",
-        description="User-Agent header sent with outbound requests.",
-    )
-    allowed_domains: list[str] = Field(
-        default_factory=list,
-        description="Optional whitelist of domains allowed for parsing.",
-    )
+    http_timeout: float = Field(default=10.0, gt=0)
+    http_max_retries: int = Field(default=3, ge=0)
+    parser_user_agent: str = Field(default="CourseParserBot/1.0")
+    allowed_domains: list[str] = Field(default_factory=list)
 
     @field_validator("allowed_domains", mode="before")
     @classmethod
@@ -57,7 +35,6 @@ class Settings(BaseSettings):
         return list(value)
 
     def is_domain_allowed(self, url: str) -> bool:
-        """Validate that the given URL matches the configured whitelist."""
         if not self.allowed_domains:
             return True
 
@@ -66,7 +43,6 @@ class Settings(BaseSettings):
         return any(host == domain or host.endswith(f".{domain}") for domain in self.allowed_domains)
 
     def validate_url(self, url: str) -> str:
-        """Raise a descriptive error if the URL is not allowed."""
         if not self.is_domain_allowed(url):
             host = urlparse(url).hostname or ""
             raise ValueError(f"Domain '{host}' is not permitted for parsing.")
@@ -75,7 +51,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Cached accessor to avoid re-parsing env variables."""
     return Settings()
 
 

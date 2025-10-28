@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 @router.get("/healthz", tags=["meta"])
 async def healthcheck() -> dict[str, str]:
-    """Simple readiness probe."""
     return {"status": "ok"}
 
 
@@ -96,11 +95,5 @@ async def preview_url(
     url: str,
     parser: ParserClient = Depends(get_parser_client),
 ) -> dict[str, str]:
-    """
-    Fetch the raw HTML for quick validation.
-
-    This endpoint is intended for internal diagnostics and should be protected
-    via authentication or removed in production environments.
-    """
     content = await parser.fetch_html(url)
     return {"url": url, "content_snippet": content[:500]}
